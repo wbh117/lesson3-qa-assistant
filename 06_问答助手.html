@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>课程问答助手 · 第3课制作</title>
+<style>
+:root{--c1:#3757d6;--c2:#eef2ff;--ok:#0f8a4d;--warn:#b45309;--ref:#b91c1c;--bd:#dbe2f0;--tx:#1f2430;--mut:#6b7280}
+*{box-sizing:border-box}
+body{margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--tx);background:#f6f8fc}
+.wrap{max-width:720px;margin:0 auto;padding:24px 16px 40px}
+header{background:linear-gradient(135deg,var(--c1),#6b7ff0);color:#fff;border-radius:14px;padding:22px 20px;margin-bottom:18px}
+header h1{margin:0 0 6px;font-size:22px}
+header p{margin:0;opacity:.85;font-size:13px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+.ask{display:flex;gap:10px}
+.ask input{flex:1;padding:12px 14px;border:1px solid var(--bd);border-radius:10px;font-size:15px;outline:none}
+.ask input:focus{border-color:var(--c1)}
+.ask button{padding:12px 22px;border:0;border-radius:10px;background:var(--c1);color:#fff;font-size:15px;cursor:pointer}
+.ask button:hover{opacity:.9}
+.examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.examples button{padding:7px 12px;font-size:13px;border:1px solid var(--bd);background:var(--c2);color:var(--c1);border-radius:999px;cursor:pointer}
+.examples button:hover{background:#dde5ff}
+.result{margin-top:4px}
+.badge{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;margin-bottom:8px}
+.badge.answer{background:#e7f6ee;color:var(--ok)}
+.badge.refuse{background:#fdeaea;color:var(--ref)}
+.badge.tie{background:#fff4e0;color:var(--warn)}
+.ans{font-size:15px;line-height:1.7;white-space:pre-wrap}
+.meta{margin-top:10px;padding-top:10px;border-top:1px dashed var(--bd);font-size:12.5px;color:var(--mut);line-height:1.9}
+.meta b{color:var(--tx)}
+.cand{border:1px solid var(--bd);border-radius:10px;padding:12px;margin-top:8px}
+footer{font-size:12px;color:var(--mut);text-align:center;margin-top:22px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>📚 课程问答助手</h1>
+  <p>《人工智能工具应用实践》课程 FAQ · 越界检测 → 本地匹配 → 阈值拒答</p>
+</header>
+
+<div class="card">
+  <div class="ask">
+    <input id="q" placeholder="输入课程相关问题，例如：课件在哪里下载" onkeydown="if(event.key==='Enter')ask()">
+    <button onclick="ask()">提问</button>
+  </div>
+  <div class="examples" id="ex"></div>
+</div>
+
+<div class="card result" id="out" hidden></div>
+
+<footer>基于本地课堂 FAQ，不连接外部大模型<br>知识库 17 条 · 拒答规则 8 条 · 低置信度阈值 0.35 · 单文件零依赖</footer>
+</div>
+
+<script>
+const KB = {"note": "第3课课程知识库；answer 逐字取自 02_规范问答集.csv，未编造任何政策；q18/q19（待补充）未入库", "items": [{"id": "q01", "question": "这门课一共几次课", "aliases": ["课程有几次课呀", "一共几节课", "课程共有多少次", "课程总共有几节课"], "answer": "共 16 次课，每次 2 课时，合计 32 课时。", "tags": ["课程内容", "课时"], "source": "q01 + 原始语料行1,2,3", "scope": "课程内容", "updated": "2026-11-26"}, {"id": "q02", "question": "课件在哪里下载", "aliases": ["课件在哪下", "幻灯片哪里下载", "PPT哪里下载"], "answer": "在课程网站「课件中心」页面按课次下载，也可在首页下载区取用。", "tags": ["平台操作", "课件"], "source": "q02 + 原始语料行4,5", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q03", "question": "练习资源包怎么拿", "aliases": ["练习资源包在哪儿", "资源包怎么下载", "ZIP包在哪"], "answer": "在「练习下载」页面按课次点击对应的 ZIP 资源包即可下载。", "tags": ["平台操作", "练习资源包"], "source": "q03 + 原始语料行6,9", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q04", "question": "一次练习要做多久", "aliases": ["练习要做多久", "一套练习多长时间"], "answer": "每套练习设计为 70—100 分钟，不少于 60 分钟。", "tags": ["课程内容", "练习"], "source": "q04 + 原始语料行8", "scope": "课程内容", "updated": "2026-11-26"}, {"id": "q05", "question": "练习题可以一个人做吗", "aliases": ["需要组队吗", "可以单人完成吗", "练习能组队吗"], "answer": "可以。每次课的练习题均按单人独立完成设计，不需要组队。", "tags": ["课程内容", "练习"], "source": "q05 + 原始语料行7,12", "scope": "课程内容", "updated": "2026-11-26"}, {"id": "q06", "question": "课程用哪些工具", "aliases": ["主要用啥工具", "用什么软件", "课程工具是什么"], "answer": "以 WorkBuddy 为主要工具；Trae、DeepSeek 等作为可选对照工具，不参与验收。", "tags": ["工具使用", "WorkBuddy"], "source": "q06 + 原始语料行13,14", "scope": "工具使用", "updated": "2026-11-26"}, {"id": "q07", "question": "没装 Trae 会不会影响成绩", "aliases": ["不装Trae影响成绩吗", "Trae必须装吗", "可选工具要装吗"], "answer": "不会。可选工具不参与验收，缺少账号不影响完成任务。", "tags": ["工具使用", "Trae"], "source": "q07 + 原始语料行15", "scope": "工具使用", "updated": "2026-11-26"}, {"id": "q08", "question": "不会编程能选吗", "aliases": ["没有编程基础能选吗", "零基础可以学吗", "要会写代码吗"], "answer": "可以。课程不要求编程基础，全部任务提供逐步操作指导。", "tags": ["课程内容", "编程基础"], "source": "q08 + 原始语料行16", "scope": "课程内容", "updated": "2026-11-26"}, {"id": "q09", "question": "术语词典在哪", "aliases": ["Term是什么意思", "术语表在哪", "词典在哪个页面"], "answer": "在课程网站「术语词典」页面，可按关键词检索。", "tags": ["平台操作", "术语词典"], "source": "q09 + 原始语料行17,18", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q10", "question": "课程大纲在哪看", "aliases": ["大纲在哪", "syllabus在哪看", "课程安排在哪看"], "answer": "在课程网站「课程大纲」页面，按 16 次课逐条列出。", "tags": ["平台操作", "课程大纲"], "source": "q10 + 原始语料行20", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q11", "question": "有没有教材", "aliases": ["教材在哪", "有没有课本", "分章文本在哪"], "answer": "课程提供教材文本阅读版与分章文本，可在网站「拓展资源」中取用。", "tags": ["平台操作", "教材"], "source": "q11 + 原始语料行21,22", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q12", "question": "静态展示版能登录吗", "aliases": ["静态版可以登录吗", "GitHub Pages版能登录吗", "静态展示版登录可用吗"], "answer": "不能。GitHub Pages 静态展示版不运行后端，登录与提交功能不可用，但资料可以直接下载。", "tags": ["平台操作", "静态展示版"], "source": "q12 + 原始语料行24", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q13", "question": "静态版怎么下载资料", "aliases": ["静态版资料怎么下", "不用登录能下载吗", "静态版怎么拿练习"], "answer": "练习资源为公开静态文件，无需登录即可在「练习下载」页面直接下载。", "tags": ["平台操作", "下载"], "source": "q13 + 原始语料行25", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q14", "question": "个人中心能干什么", "aliases": ["个人中心有什么用", "个人中心功能", "登录后能看什么"], "answer": "登录后可以查看自己的选课意向与学习反馈记录。", "tags": ["平台操作", "个人中心"], "source": "q14 + 原始语料行23", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q15", "question": "作业什么时候交", "aliases": ["作业截止时间", "作业什么时候要交", "作业提交期限"], "answer": "作业提交时间以课程通知为准；未在语料中给出的具体日期一律不作答复。", "tags": ["作业提交"], "source": "q15 + 原始语料行10", "scope": "作业提交", "updated": "2026-11-26"}, {"id": "q16", "question": "知识图谱能看吗", "aliases": ["知识点关联图在哪", "图谱在哪看", "知识模块在哪"], "answer": "可以，在「知识模块」页面查看知识点之间的关联图。", "tags": ["平台操作", "知识图谱"], "source": "q16 + 原始语料行19", "scope": "平台操作", "updated": "2026-11-26"}, {"id": "q17", "question": "忘了密码怎么办", "aliases": ["密码忘了怎么办", "忘记密码怎么处理", "账号密码忘了"], "answer": "本地完整交互版的账号由课程负责人管理；静态展示版不提供登录，无需密码。", "tags": ["平台操作", "账号"], "source": "q17 + 原始语料行26", "scope": "平台操作", "updated": "2026-11-26"}]};
+const CFG = {"version": "1.0", "updated": "2026-11-26", "note": "拒答规则配置：越界检测在匹配打分之前执行，命中任一规则立即拒答并停止。", "pipeline_order": ["normalize", "refusal_check", "kb_match", "threshold_decide"], "match_threshold": 0.35, "low_confidence_message": "抱歉，知识库中没有找到与该问题足够匹配的条目，本助手不作猜测，请换个问法或咨询课程负责人。", "tie_handling": {"condition": "最高得分与次高得分完全相等且均≥阈值", "behavior": "同时显示 2 条候选答案，标注「可能需要人工确认」，并分别给出得分与来源"}, "no_hit_handling": "无任何候选（得分=0）时按低置信度拒答处理，显示兜底话术，不输出任何猜测性内容", "refusal_rules": [{"rule_id": "V01", "category": "成绩与分数", "keywords": ["成绩", "分数", "排名", "绩点", "挂科"], "condition": "问句包含任一关键词，且不满足豁免条件", "exemption": "问句同时包含工具语境词（WorkBuddy、Trae、DeepSeek、工具、可选、安装、装）时不判定越界（避免「没装Trae会不会影响成绩」被误拒）", "action": "refuse", "message": "请咨询课程负责人，本助手只回答课程资料与平台使用问题。", "example": "我的成绩是多少"}, {"rule_id": "V02", "category": "代写与学术诚信", "keywords": ["帮我写", "帮我做", "代做", "代写", "答案是什么", "直接给答案"], "condition": "问句包含任一关键词", "exemption": "", "action": "refuse", "message": "超出本助手范围，本助手不代写作业，可提供操作步骤指引。", "example": "能不能帮我写作业"}, {"rule_id": "V03", "category": "个人隐私", "keywords": ["身份证", "手机号", "家庭住址", "他人信息", "学号"], "condition": "问句包含任一关键词", "exemption": "", "action": "refuse", "message": "本助手不处理个人信息，请勿在此输入。", "example": "查一下某同学的手机号"}, {"rule_id": "V04", "category": "医疗法律投资建议", "keywords": ["看病", "法律", "投资", "荐股", "理财", "基金", "股票"], "condition": "问句包含任一关键词", "exemption": "", "action": "refuse", "message": "超出本助手范围，请咨询相应专业人士。", "example": "该买哪只基金"}, {"rule_id": "V05", "category": "精确日期与考场", "keywords": ["几月几号", "几月几日", "哪天考试", "考场在哪", "几点开考", "考试时间", "考试日期"], "condition": "问句包含任一关键词", "exemption": "", "action": "refuse", "message": "具体日期以课程通知为准，本助手不提供未收录的日期。", "example": "考试是几月几号"}, {"rule_id": "V06", "category": "外部平台账号问题", "keywords": ["密码找回", "账号被封", "付费", "充值", "退款"], "condition": "问句包含任一关键词", "exemption": "问句为课程知识库 q17（忘了密码怎么办）的常规忘密码问法时不判定越界（不含找回/被封等平台操作词）", "action": "refuse", "message": "请通过对应平台的官方渠道处理；静态展示版不提供登录。", "example": "帮我找回平台密码"}, {"rule_id": "V07", "category": "政治敏感与不当内容", "keywords": ["侮辱", "歧视", "色情", "暴力", "违禁"], "condition": "问句包含任一关键词", "exemption": "", "action": "refuse", "message": "该问题不在本助手服务范围内。", "example": "（课堂占位，不写具体示例）"}, {"rule_id": "V08", "category": "与本课无关的闲聊", "keywords": ["天气", "你好", "你是谁", "讲个笑话", "聊天"], "condition": "问句包含闲聊关键词，或（不含任何课程术语且有效长度<4字）", "course_terms_hint": "课,作业,练习,课件,教材,大纲,工具,术语,知识,登录,下载,账号,平台,静态,资源,考试安排说明页,个人中心", "exemption": "", "action": "refuse", "message": "本助手只回答《人工智能工具应用实践》课程相关问题。", "example": "今天天气怎么样"}]};
+const TH = CFG.match_threshold;
+const RULES = CFG.refusal_rules;
+const COURSE_TERMS = (RULES.find(r=>r.rule_id==="V08").course_terms_hint||"").split(",").filter(Boolean);
+
+// ---------- 与 Python 评测脚本完全同口径的匹配逻辑 ----------
+function norm(s){return s.toLowerCase().replace(/[\s，。？?！!、,\.·（）()\[\]"'「」]/g,"")}
+function bigrams(s){const a=new Set();for(let i=0;i<s.length-1;i++)a.add(s.slice(i,i+2));return a}
+function containment(qb,cb){if(qb.size===0)return 0;let hit=0;qb.forEach(b=>{if(cb.has(b))hit++});return hit/qb.size}
+function tagBonus(qn,item){let b=0;for(const t of item.tags){if(qn.includes(norm(t)))b+=0.05}return Math.min(b,0.1)}
+
+function detectRefusal(qn){
+  for(const r of RULES){
+    const kw=(r.keywords||[]).find(k=>qn.includes(norm(k)));
+    if(!kw)continue;
+    if(r.rule_id==="V01"&&(r.exemption||"")){
+      const ex=["workbuddy","trae","deepseek","工具","可选","安装","装"];
+      if(ex.some(e=>qn.includes(e)))continue;
+    }
+    if(r.rule_id==="V08"){
+      if(qn.includes(norm(kw)))return {r,kw};
+      if(qn.length<4&&!COURSE_TERMS.some(t=>qn.includes(norm(t))))return {r,kw:null};
+      continue;
+    }
+    return {r,kw};
+  }
+  return null;
+}
+
+function answer(qRaw){
+  const qn=norm(qRaw);
+  if(!qn)return {type:"empty"};
+  // ① 越界检测（命中即拒答，不进入匹配）
+  const ref=detectRefusal(qn);
+  if(ref)return {type:"refuse",rule:ref.r.rule_id,category:ref.r.category,kw:ref.kw,msg:ref.r.message};
+  // ② 匹配打分
+  const qb=bigrams(qn);
+  const scored=[];
+  for(const it of KB.items){
+    const cands=[it.question].concat(it.aliases);
+    let best=0,bestCand="";
+    for(const c of cands){
+      const s=containment(qb,bigrams(norm(c)));
+      if(s>best){best=s;bestCand=c}
+    }
+    const final=Math.min(1,best+tagBonus(qn,it));
+    if(final>0)scored.push({it,final,bestCand});
+  }
+  scored.sort((a,b)=>b.final-a.final);
+  if(scored.length===0||scored[0].final<TH)
+    return {type:"lowconf",msg:CFG.low_confidence_message,top:scored[0]?scored[0].final:0};
+  // ③ 并列最高分
+  const top=scored[0].final;
+  const ties=scored.filter(s=>s.final===top).slice(0,2);
+  if(ties.length>=2)return {type:"tie",cands:ties};
+  return {type:"answer",it:scored[0].it,score:top,cand:scored[0].bestCand};
+}
+
+// ---------- 界面 ----------
+const EX=["课件在哪里下载","PPT 在哪拿","练习资源包怎么拿","我的成绩是多少","能不能帮我写作业","今天天气怎么样"];
+const exDiv=document.getElementById("ex");
+EX.forEach(t=>{const b=document.createElement("button");b.textContent=t;b.onclick=()=>{document.getElementById("q").value=t;ask()};exDiv.appendChild(b)});
+
+function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function ask(){
+  const q=document.getElementById("q").value.trim();
+  const out=document.getElementById("out");
+  const r=answer(q);
+  let h="";
+  if(r.type==="empty"){h='<span class="badge refuse">空输入</span><div class="ans">请输入问题后再提问。</div>';}
+  else if(r.type==="refuse"){
+    h=`<span class="badge refuse">🚫 拒答 · 命中规则 ${r.rule}（${esc(r.category)}${r.kw?"，关键词「"+esc(r.kw)+"」":""}）</div>
+       <div class="ans">${esc(r.msg)}</div>`;}
+  else if(r.type==="lowconf"){
+    h=`<span class="badge refuse">🤷 低置信度拒答（最高得分 ${r.top.toFixed(2)} &lt; 阈值 ${TH}）</div>
+       <div class="ans">${esc(r.msg)}</div>`;}
+  else if(r.type==="tie"){
+    h=`<span class="badge tie">⚠️ 并列最高分（得分 ${r.cands[0].score.toFixed(2)}）· 可能需要人工确认</div>`;
+    r.cands.forEach(c=>{h+=`<div class="cand"><div class="ans">${esc(c.it.answer)}</div>
+      <div class="meta">条目 <b>${c.it.id}</b> · 得分 <b>${c.final.toFixed(2)}</b> · 命中「${esc(c.bestCand)}」 · 来源：${esc(c.it.source)}</div></div>`;});
+  } else {
+    h=`<span class="badge answer">✅ 已命中知识条目</span>
+       <div class="ans">${esc(r.it.answer)}</div>
+       <div class="meta">条目 <b>${r.it.id}</b> · 匹配得分 <b>${r.score.toFixed(2)}</b>（阈值 ${TH}）· 命中问法「<b>${esc(r.cand)}</b>」<br>
+       来源：${esc(r.it.source)} · 范围：${esc(r.it.scope)} · 更新：${esc(r.it.updated)}</div>`;
+  }
+  out.innerHTML=h;out.hidden=false;
+}
+</script>
+</body>
+</html>

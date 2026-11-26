@@ -1,0 +1,103 @@
+# -*- coding: utf-8 -*-
+"""步骤4：生成 05_规则配置.json（机器可读）与 04_拒答规则.md 文档中引用的规则数据。"""
+import json
+
+config = {
+    "version": "1.0",
+    "updated": "2026-11-26",
+    "note": "拒答规则配置：越界检测在匹配打分之前执行，命中任一规则立即拒答并停止。",
+    "pipeline_order": ["normalize", "refusal_check", "kb_match", "threshold_decide"],
+    "match_threshold": 0.35,
+    "low_confidence_message": "抱歉，知识库中没有找到与该问题足够匹配的条目，本助手不作猜测，请换个问法或咨询课程负责人。",
+    "tie_handling": {
+        "condition": "最高得分与次高得分完全相等且均≥阈值",
+        "behavior": "同时显示 2 条候选答案，标注「可能需要人工确认」，并分别给出得分与来源",
+    },
+    "no_hit_handling": "无任何候选（得分=0）时按低置信度拒答处理，显示兜底话术，不输出任何猜测性内容",
+    "refusal_rules": [
+        {
+            "rule_id": "V01", "category": "成绩与分数",
+            "keywords": ["成绩", "分数", "排名", "绩点", "挂科"],
+            "condition": "问句包含任一关键词，且不满足豁免条件",
+            "exemption": "问句同时包含工具语境词（WorkBuddy、Trae、DeepSeek、工具、可选、安装、装）时不判定越界（避免「没装Trae会不会影响成绩」被误拒）",
+            "action": "refuse",
+            "message": "请咨询课程负责人，本助手只回答课程资料与平台使用问题。",
+            "example": "我的成绩是多少",
+        },
+        {
+            "rule_id": "V02", "category": "代写与学术诚信",
+            "keywords": ["帮我写", "帮我做", "代做", "代写", "答案是什么", "直接给答案"],
+            "condition": "问句包含任一关键词",
+            "exemption": "",
+            "action": "refuse",
+            "message": "超出本助手范围，本助手不代写作业，可提供操作步骤指引。",
+            "example": "能不能帮我写作业",
+        },
+        {
+            "rule_id": "V03", "category": "个人隐私",
+            "keywords": ["身份证", "手机号", "家庭住址", "他人信息", "学号"],
+            "condition": "问句包含任一关键词",
+            "exemption": "",
+            "action": "refuse",
+            "message": "本助手不处理个人信息，请勿在此输入。",
+            "example": "查一下某同学的手机号",
+        },
+        {
+            "rule_id": "V04", "category": "医疗法律投资建议",
+            "keywords": ["看病", "法律", "投资", "荐股", "理财", "基金", "股票"],
+            "condition": "问句包含任一关键词",
+            "exemption": "",
+            "action": "refuse",
+            "message": "超出本助手范围，请咨询相应专业人士。",
+            "example": "该买哪只基金",
+        },
+        {
+            "rule_id": "V05", "category": "精确日期与考场",
+            "keywords": ["几月几号", "几月几日", "哪天考试", "考场在哪", "几点开考", "考试时间", "考试日期"],
+            "condition": "问句包含任一关键词",
+            "exemption": "",
+            "action": "refuse",
+            "message": "具体日期以课程通知为准，本助手不提供未收录的日期。",
+            "example": "考试是几月几号",
+        },
+        {
+            "rule_id": "V06", "category": "外部平台账号问题",
+            "keywords": ["密码找回", "账号被封", "付费", "充值", "退款"],
+            "condition": "问句包含任一关键词",
+            "exemption": "问句为课程知识库 q17（忘了密码怎么办）的常规忘密码问法时不判定越界（不含找回/被封等平台操作词）",
+            "action": "refuse",
+            "message": "请通过对应平台的官方渠道处理；静态展示版不提供登录。",
+            "example": "帮我找回平台密码",
+        },
+        {
+            "rule_id": "V07", "category": "政治敏感与不当内容",
+            "keywords": ["侮辱", "歧视", "色情", "暴力", "违禁"],
+            "condition": "问句包含任一关键词",
+            "exemption": "",
+            "action": "refuse",
+            "message": "该问题不在本助手服务范围内。",
+            "example": "（课堂占位，不写具体示例）",
+        },
+        {
+            "rule_id": "V08", "category": "与本课无关的闲聊",
+            "keywords": ["天气", "你好", "你是谁", "讲个笑话", "聊天"],
+            "condition": "问句包含闲聊关键词，或（不含任何课程术语且有效长度<4字）",
+            "course_terms_hint": "课,作业,练习,课件,教材,大纲,工具,术语,知识,登录,下载,账号,平台,静态,资源,考试安排说明页,个人中心",
+            "exemption": "",
+            "action": "refuse",
+            "message": "本助手只回答《人工智能工具应用实践》课程相关问题。",
+            "example": "今天天气怎么样",
+        },
+    ],
+}
+
+with open("05_规则配置.json", "w", encoding="utf-8") as f:
+    json.dump(config, f, ensure_ascii=False, indent=2)
+
+# 校验
+c = json.load(open("05_规则配置.json", encoding="utf-8"))
+assert len(c["refusal_rules"]) == 8, "规则必须为 8 条"
+ids = [r["rule_id"] for r in c["refusal_rules"]]
+assert ids == [f"V0{i}" for i in range(1, 9)], ids
+assert c["match_threshold"] == 0.35
+print("OK 05_规则配置.json：8 条规则齐全，阈值 0.35，并列处理与无命中处理已定义")
